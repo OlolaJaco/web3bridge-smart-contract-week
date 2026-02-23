@@ -1,11 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-import "./MyERC20.sol";
+import {MyERC20} from "./MyERC20.sol";
 
 
 contract SchoolManagementSystem {
 
+
     MyERC20 public token;
+
+    //mapping level to level fee
+    mapping (uint16 => uint) levelFees;
+
+    constructor( address _tokenAddress ) {
+        levelFees[100] = 100;
+        levelFees[200] = 200;
+        levelFees[300] = 300;
+        levelFees[400] = 400;
+        token = MyERC20(_tokenAddress);
+    }
 
     struct Student {
         uint8 id;
@@ -22,6 +34,7 @@ contract SchoolManagementSystem {
         uint salary;
         string registeredAt;
     }
+    
 
     //Array of students
     Student[] public students;
@@ -41,25 +54,18 @@ contract SchoolManagementSystem {
     event StudentRegistered(uint8 indexed id, string name, uint fees, bool hasPaid, uint level);
 
     // student registration
-    function registerStudent( string memory _name, uint _level ) public payable {
+    function registerStudent( string memory _name, uint16 _level ) public payable {
         require(
             _level == 100 || _level == 200 || _level == 300 || _level == 400,
             "Invalid level. Must be 100, 200, 300, or 400"
         );
 
+        fees = levelFees[_level];
+
         uint8 id = student_id + 1;
 
-        if ( _level == 100 ) {
-            fees = 10;
-        } else if ( _level == 200 ) {
-            fees = 20;
-        } else if ( _level == 300 ) {
-            fees = 30;
-        } else if ( _level == 400 ) {
-            fees = 40;
-        }
-
-        fees = msg.value;
+        bool success = token.transferFrom(msg.sender, address(this), fees);
+        require(success, "Transfer failed");
 
         //creating individual students
         Student memory student = Student({ id: id, name: _name, hasPaid: true, timeStamp: block.timestamp, level: _level, schoolFess: fees });
@@ -69,13 +75,10 @@ contract SchoolManagementSystem {
         emit StudentRegistered(id, _name, fees, true, _level);
     }
 
-    function paySchoolFees(address _student) public payable  {
-        token.transfer(_student, fees);
-    }
-
     function getAllStudents() external view returns(Student[] memory) {
         return students;
     }
+
 
     // staff registration
     function registerStaff(string memory _name) public {
@@ -89,7 +92,8 @@ contract SchoolManagementSystem {
     function payStaff ( uint _id ) payable public {
         for ( uint8 i; i < staffs.length; i++) {
             if (staffs[i].id == _id) {
-                token.transfer(msg.sender, 5);
+                bool success = token.transfer(msg.sender, 5);
+                require(success);
                 break;
             }
         }
